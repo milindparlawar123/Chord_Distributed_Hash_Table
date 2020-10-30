@@ -26,6 +26,8 @@ import org.apache.thrift.transport.TServerSocket;
 import org.apache.thrift.transport.TServerTransport;
 import org.apache.thrift.transport.TSSLTransportFactory.TSSLTransportParameters;
 
+import java.net.InetAddress;
+
 // Generated code
 
 import java.util.HashMap;
@@ -40,7 +42,7 @@ public class JavaServer {
 
   public static void main(String [] args) {
     try {
-      handler = new FileStoreHandler();
+      handler = new FileStoreHandler(InetAddress.getLocalHost().getHostAddress()+":"+args[0]);
       processor = new FileStore.Processor(handler);
       port= Integer.valueOf(args[0]);
       Runnable simple = new Runnable() {
@@ -66,10 +68,10 @@ public class JavaServer {
   public static void simple(FileStore.Processor processor) {
     try {
       TServerTransport serverTransport = new TServerSocket(port);
-      TServer server = new TSimpleServer(new Args(serverTransport).processor(processor));
+      //TServer server = new TSimpleServer(new Args(serverTransport).processor(processor));
 
       // Use this for a multithreaded server
-      // TServer server = new TThreadPoolServer(new TThreadPoolServer.Args(serverTransport).processor(processor));
+       TServer server = new TThreadPoolServer(new TThreadPoolServer.Args(serverTransport).processor(processor));
 
       System.out.println("Starting the simple server...");
       server.serve();

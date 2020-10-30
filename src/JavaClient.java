@@ -19,6 +19,11 @@
 
 // Generated code
 
+import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+
 import org.apache.thrift.TException;
 import org.apache.thrift.transport.TSSLTransportFactory;
 import org.apache.thrift.transport.TTransport;
@@ -74,11 +79,72 @@ public class JavaClient {
 
   private static void perform(FileStore.Client client) throws TException
   {
+	  writingTestCasePositive(client);
+	
 	  System.out.println("before readFile()");
-     if ( null == client.readFile("")) {
-    	 System.out.println("nullllll");
-     }
+     
+	  readTestCasePositive(client);
     System.out.println("readFile()");
 
   }
+  private static void writingTestCasePositive(FileStore.Client client) throws TException, SystemException   {
+	  RFileMetadata fileMetadata= new RFileMetadata();
+	  fileMetadata.setFilename("tesing.txt");
+	  RFile rFile = new RFile();
+	  rFile.setMeta(fileMetadata);
+	  rFile.setContent("abc");
+	  
+	  NodeID destNode = client.findSucc(getSHA256( fileMetadata.getFilename()));
+	  
+	  System.out.println(" in writingTestCasePositive "+ destNode.getIp() + " | "+ destNode.getPort());
+		TTransport transport = new TSocket(destNode.getIp(), destNode.getPort());
+		transport.open();
+		TProtocol protocol = new TBinaryProtocol(transport);
+		FileStore.Client writerClient = new FileStore.Client(protocol);
+
+		writerClient.writeFile(rFile);
+	  
+  }
+  private static void readTestCasePositive(FileStore.Client client) throws TException, SystemException   {
+	  String key = getSHA256("tesing.txt");
+	  
+	  NodeID destNode = client.findSucc(getSHA256(key));
+	  
+	  System.out.println(" in readingTestCasePositive "+ destNode.getIp() + " | "+ destNode.getPort());
+		TTransport transport = new TSocket(destNode.getIp(), destNode.getPort());
+		transport.open();
+		TProtocol protocol = new TBinaryProtocol(transport);
+		FileStore.Client readClient = new FileStore.Client(protocol);
+
+		RFile rFile=readClient.readFile("tesing.txt");
+		System.out.println(rFile.getContent() +" | "+ rFile.getMeta().getVersion()+" | "+rFile.getMeta().getFilename());
+	  
+  }
+  public static  String getSHA256(String str)  {
+		MessageDigest messageDigest= null;
+		try {
+			messageDigest = MessageDigest.getInstance("SHA-256");
+		} catch (NoSuchAlgorithmException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+		StringBuilder hstr= null;
+		try {
+			hstr = new StringBuilder(
+					new BigInteger(1, messageDigest.digest(str.getBytes(StandardCharsets.UTF_8))).toString(16));
+			
+			for(int i =hstr.length() ;i<= 31 ; i++) {
+				hstr.insert(0, '0');	
+			}
+		} 
+		catch (NumberFormatException e) {
+			e.printStackTrace();
+		}
+		catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		return hstr.toString();
+	} 
 }

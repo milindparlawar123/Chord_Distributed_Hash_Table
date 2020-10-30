@@ -18,25 +18,88 @@
  */
 
 import org.apache.thrift.TException;
-
+import org.apache.thrift.transport.TTransportException;
+import org.apache.thrift.transport.TTransport;
+import org.apache.thrift.transport.TSocket;
+import org.apache.thrift.protocol.TProtocol;
+import org.apache.thrift.protocol.TBinaryProtocol;
+import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 // Generated code
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 public class FileStoreHandler implements FileStore.Iface {
 
-	private List<NodeID> fingerTable;
+	private List<NodeID> fingerTable=null;
+	private NodeID curNode=null;
+	private Map<String, Map<String,String>> fileStorage=null;
+	public static int zero=0;
+	public FileStoreHandler(String ipPort) {
+		// TODO Auto-generated constructor stub
+		this.curNode=new NodeID(getSHA256(ipPort), ipPort.split(":")[0],Integer.parseInt( ipPort.split(":")[1]));
+		fileStorage= new LinkedHashMap<String, Map<String,String>>();
+	}
+	
 	@Override
 	public void writeFile(RFile rFile) throws TException {
 		// TODO Auto-generated method stub
-		
+		System.out.println(" in write file ");
+		NodeID node = findSucc(getSHA256(rFile.getMeta().getFilename()));
+		System.out.println(" milind ");
+		System.out.println(node.getId() + " | "+ node.getIp() + " | "+ node.getPort());
+		//System.out.println("before version "+rFile.getMeta().getVersion()+ " map "+ fileStorage);
+		if(fileStorage.containsKey(rFile.getMeta().getFilename())) {
+			
+			Map<String, String > newMap=fileStorage.get(rFile.getMeta().getFilename());
+			int temp =Integer.parseInt(newMap.get("V"))+1;
+			newMap.put("V", temp+"");
+ 				System.out.println(fileStorage);
+			fileStorage.put(rFile.getMeta().getFilename(),
+					newMap);	
+			
+		}else {
+			Map<String, String> map = new LinkedHashMap<String, String>();
+			map.put("V", "0");
+			map.put("C",rFile.getContent() );
+			fileStorage.put(rFile.getMeta().getFilename(), map);
+			System.out.println("misseddd  ");
+		}
 	}
 
 	@Override
 	public RFile readFile(String filename) throws TException {
 		// TODO Auto-generated method stub
-		System.out.println("fing tab size "+fingerTable.size());
-		return new RFile();
+		System.out.println("inside read fing tab size "+fingerTable.size());
+		
+		String key = getSHA256(filename);
+		NodeID nodeID= findSucc(key);
+		RFile rFile = new RFile();
+		RFileMetadata rFileMetadata= new RFileMetadata();
+		
+		if(fileStorage.get(filename) != null) {
+		Map<String, String> map= fileStorage.get(filename);
+
+			rFile.setContent(map.get("C"));
+			rFile.setContentIsSet(true);
+			rFileMetadata.setFilename(filename);
+			rFileMetadata.setFilenameIsSet(true);
+			rFileMetadata.setVersion(Integer.parseInt(map.get("V")));
+			rFileMetadata.setVersionIsSet(true);
+			rFile.setMeta(rFileMetadata);
+			rFile.setMetaIsSet(true);
+			
+			
+		}else {
+			
+		}
+		
+		
+		return rFile;
 	}
 
 	@Override
@@ -44,25 +107,117 @@ public class FileStoreHandler implements FileStore.Iface {
 		// TODO Auto-generated method stub
 		fingerTable=node_list;
 		System.out.println("fing tab size "+node_list.size());
+		for(NodeID n: node_list) {
+			//System.out.println(n.getId() +"|"+n.getIp()+"|"+ n.getPort()+"|");
+		}
 	}
 
 	@Override
-	public NodeID findSucc(String key) throws TException {
+	public NodeID findSucc(String key) throws TException, SystemException {
 		// TODO Auto-generated method stub
-		return null;
+		//System.out.println("in find succ ");
+		NodeID nodeID= findPred(key);
+		System.out.println(" ooo ");
+		TTransport transport = null;
+		FileStore.Client client = null;
+		try {
+			System.out.println(nodeID.getIp()+ " .||. "+ nodeID.getPort());
+			transport = new TSocket(nodeID.getIp(), nodeID.getPort());
+			transport.open();
+
+			TProtocol protocol = new TBinaryProtocol(transport);
+			client = new FileStore.Client(protocol);
+		} catch (Exception e) {
+			System.err.println("Exception occured:" + e.getMessage());
+			System.exit(0);
+		}
+	//	System.out.println(" ppp ");
+		return client.getNodeSucc();
+		//return getNodeSucc();
+
+		
 	}
 
 	@Override
 	public NodeID findPred(String key) throws TException {
 		// TODO Auto-generated method stub
-		return null;
+		//System.out.println("in  findPred "+ curNode.getId());
+		// chedck against first finger table entry for break condition
+		if(isBetween(key, curNode.getId(), fingerTable.get(zero).getId())) {
+			System.out.println(" curNode >> ");
+			return curNode;
+		}
+		
+		// if break condition did not meet then 
+		// below for loop to check from bottom up 
+		System.out.println(" ishid ");
+			for(int i =fingerTable.size()-1; i>zero ;i--) {
+				NodeID fingNode= fingerTable.get(i);
+				if(isBetween(key, curNode.getId(), fingNode.getId())) {
+	
+					TTransport transport = new TSocket(fingNode.getIp(), fingNode.getPort());
+					transport.open();
+
+					TProtocol protocol = new TBinaryProtocol(transport);
+					FileStore.Client client = new FileStore.Client(protocol);
+					return client.findPred(key);
+						
+				}
+			}
+	
+		
+			System.out.println(" return curNode");
+		return curNode;
 	}
 
 	@Override
 	public NodeID getNodeSucc() throws TException {
 		// TODO Auto-generated method stub
-		return null;
+		System.out.println(" getNodeSucc  ");
+		return fingerTable.get(zero);
 	}
 	
+
+	
+	public  String getSHA256(String str)  {
+		MessageDigest messageDigest= null;
+		try {
+			messageDigest = MessageDigest.getInstance("SHA-256");
+		} catch (NoSuchAlgorithmException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+		StringBuilder hstr= null;
+		try {
+			hstr = new StringBuilder(
+					new BigInteger(1, messageDigest.digest(str.getBytes(StandardCharsets.UTF_8))).toString(16));
+			
+			for(int i =hstr.length() ;i<= 31 ; i++) {
+				hstr.insert(zero, '0');	
+			}
+		} 
+		catch (NumberFormatException e) {
+			e.printStackTrace();
+		}
+		catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		return hstr.toString();
+	} 
+	
+	public boolean isBetween(String key, String  curId, String fingTabId) {
+		//break condition
+		if(key.compareTo(curId) > 0 && fingTabId.compareTo(key) >0) {
+			return true;
+		}
+		
+		// looking up in finger table in down - up 
+		if(fingTabId.compareTo(curId) > 0 && key.compareTo(fingTabId)>0) {
+			return true;
+		}
+		return false;
+	}
 }
 
