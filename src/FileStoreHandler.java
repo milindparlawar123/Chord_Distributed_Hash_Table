@@ -43,6 +43,8 @@ public class FileStoreHandler implements FileStore.Iface {
 		// TODO Auto-generated constructor stub
 		this.curNode=new NodeID(getSHA256(ipPort), ipPort.split(":")[0],Integer.parseInt( ipPort.split(":")[1]));
 		fileStorage= new LinkedHashMap<String, Map<String,String>>();
+		System.out.println("My node hash value : "+getSHA256(ipPort));
+		System.out.println("......................................................................");
 	}
 	
 	@Override
@@ -50,24 +52,21 @@ public class FileStoreHandler implements FileStore.Iface {
 		// TODO Auto-generated method stub
 		//System.out.println(" in write file ");
 		NodeID node = findSucc(getSHA256(rFile.getMeta().getFilename()));
-		//NodeID node = findSucc("a");
 		
 		if(node.equals(curNode) == false) {
 			SystemException systemException = new SystemException();
 			throw new SystemException().setMessage("error in write file, node is not serving this file key"
-					+ "please check on other node");
+					+ " please check on other node");
 		}
-		System.out.println("currenot "+ curNode.getId() + " | "+ curNode.getIp() + " | "+curNode.getPort());
-		System.out.println("hash  >> "+getSHA256(rFile.getMeta().getFilename()) );
-		//System.out.println(" milind ");
-		//System.out.println(node.getId() + " | "+ node.getIp() + " | "+ node.getPort());
-		//System.out.println("before version "+rFile.getMeta().getVersion()+ " map "+ fileStorage);
+		//System.out.println("currenot "+ curNode.getId() + " | "+ curNode.getIp() + " | "+curNode.getPort());
+		//System.out.println("hash  >> "+getSHA256(rFile.getMeta().getFilename()) );
+		
 		if(fileStorage.containsKey(rFile.getMeta().getFilename())) {
 			
 			Map<String, String > newMap=fileStorage.get(rFile.getMeta().getFilename());
 			int temp =Integer.parseInt(newMap.get("V"))+1;
 			newMap.put("V", temp+"");
- 			//	System.out.println(fileStorage);
+ 			
 			fileStorage.put(rFile.getMeta().getFilename(),
 					newMap);	
 			
@@ -91,7 +90,7 @@ public class FileStoreHandler implements FileStore.Iface {
 		if(nodeID.equals(curNode) == false) {
 			SystemException systemException = new SystemException();
 			throw new SystemException().setMessage("error in read file, node is not serving  this file key, please check on"
-					+ "other node");
+					+ " other node");
 		}
 		
 		
@@ -123,10 +122,15 @@ public class FileStoreHandler implements FileStore.Iface {
 	public void setFingertable(List<NodeID> node_list) throws TException {
 		// TODO Auto-generated method stub
 		fingerTable=node_list;
-		System.out.println("fing tab size "+node_list.size());
-		for(NodeID n: node_list) {
-			System.out.println(n.getId() +"|"+n.getIp()+"|"+ n.getPort()+"|");
+		if(node_list!= null && node_list.size() == 256) {
+			System.out.println("finger table loaded");
+			System.out.println("......................................................................");
 		}
+		/*
+		 * System.out.println("fing tab size "+node_list.size()); for(NodeID n:
+		 * node_list) { System.out.println(n.getId() +"|"+n.getIp()+"|"+
+		 * n.getPort()+"|"); }
+		 */
 	}
 
 	@Override
@@ -134,7 +138,7 @@ public class FileStoreHandler implements FileStore.Iface {
 		// TODO Auto-generated method stub
 		//System.out.println("in find succ ");
 		NodeID nodeID= findPred(key);
-		//System.out.println(" ooo ");
+		
 		TTransport transport = null;
 		FileStore.Client client = null;
 		try {
@@ -145,10 +149,10 @@ public class FileStoreHandler implements FileStore.Iface {
 			TProtocol protocol = new TBinaryProtocol(transport);
 			client = new FileStore.Client(protocol);
 		} catch (Exception e) {
-			//System.err.println("Exception occured:" + e.getMessage());
+			e.printStackTrace();
 			System.exit(0);
 		}
-	//	System.out.println(" ppp ");
+	//	System.out.println(" end of findSucc ");
 		return client.getNodeSucc();
 		//return getNodeSucc();
 
@@ -159,7 +163,7 @@ public class FileStoreHandler implements FileStore.Iface {
 	public NodeID findPred(String key) throws TException, SystemException {
 		// TODO Auto-generated method stub
 		//System.out.println("in  findPred "+ curNode.getId());
-		// chedck against first finger table entry for break condition
+	
 		if(fingerTable == null) {
 
 			throw new SystemException().setMessage("finger table is empty, please run init script");
@@ -173,7 +177,7 @@ public class FileStoreHandler implements FileStore.Iface {
 		
 		// if break condition did not meet then 
 		// below for loop to check from bottom up 
-		//System.out.println(" ishid ");
+	
 			for(int i =fingerTable.size()-1; i>zero ;i--) {
 				NodeID fingNode= fingerTable.get(i);
 				if(isBetween(fingNode.getId() , curNode.getId(), key)) {
@@ -236,27 +240,32 @@ public class FileStoreHandler implements FileStore.Iface {
 	} 
 	
 	public boolean isBetween(String key, String curId, String fingTabId) {
-
+// below code is to check all finger table conditions against key 
+		// and return true/false accordingly 
+		//System.out.println(curNode.getId()+ " | is bet : "+ key +" | "+curId +" | "+fingTabId);
 		if (curId.compareTo(fingTabId) < zero) {
-			boolean flag1 = key.compareTo(fingTabId) > zero;
+			boolean flag1 = key.compareTo(curId) > zero;
 			boolean flag2 = key.compareTo(fingTabId) <= zero;
 			if (flag1 && flag2) {
+				//System.out.println("one");
 				return true;
 			}
-
+			//System.out.println("two");
 			return false;
 		} else {
 			
-			boolean flag1 = key.compareTo(fingTabId) < zero && key.compareTo(fingTabId) <= zero;
+			boolean flag1 = key.compareTo(curId) < zero && key.compareTo(fingTabId) <= zero;
 			if (flag1) {
+				//System.out.println("three");
 				return true;
 			}
 			//
-			boolean flag2 = key.compareTo(fingTabId) > zero && key.compareTo(fingTabId) >= zero;
+			boolean flag2 = key.compareTo(curId) > zero && key.compareTo(fingTabId) >= zero;
 			if (flag2) {
+				//System.out.println("four");
 				return true;
 			}
-			
+			//System.out.println("five");
 
 			return false;
 		}

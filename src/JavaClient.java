@@ -19,6 +19,11 @@
 
 // Generated code
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -35,37 +40,19 @@ import org.apache.thrift.protocol.TProtocol;
 public class JavaClient {
   public static void main(String [] args) {
 
-    if (args.length != 3) {
-      System.out.println("Please enter 'simple' or 'secure' ip/host port");
-      System.exit(0);
-    }
-    System.out.println(" before try inside client "+ " arg1 "+args[1] + " args2 "+args[2]);
     try {
-      TTransport transport;
+      TTransport transport=null;
       boolean flag=false;
-      if (args[0].contains("simple") ) {
-    	  System.out.println("inside simpple " + args[0]);
+      if (args.length ==3) {
+ 
         transport = new TSocket(args[1], Integer.valueOf(args[2]));
         transport.open();
       }
       else {
-        /*
-         * Similar to the server, you can use the parameters to setup client parameters or
-         * use the default settings. On the client side, you will need a TrustStore which
-         * contains the trusted certificate along with the public key. 
-         * For this example it's a self-signed cert. 
-         */
-    	  System.out.println("inside client "+ " arg1 "+args[1] + " args2 "+args[2]);
-        TSSLTransportParameters params = new TSSLTransportParameters();
-        params.setTrustStore("/home/cs557-inst/thrift-0.13.0/lib/java/test/.truststore", "thrift", "SunX509", "JKS");
-        /*
-         * Get a client transport instead of a server transport. The connection is opened on
-         * invocation of the factory method, no need to specifically call open()
-         */
-        transport = TSSLTransportFactory.getClientSocket(args[1], Integer.valueOf(args[2]), 0, params);
+    	  System.out.println("please provide required argumnets : ip/ port");
+    	  System.exit(0);
       }
-
-      System.out.println(" ready to binary proto ");
+ 
       TProtocol protocol = new  TBinaryProtocol(transport);
       FileStore.Client client = new FileStore.Client(protocol);
 
@@ -80,44 +67,56 @@ public class JavaClient {
   private static void perform(FileStore.Client client) throws TException
   {
 	  writingTestCasePositive(client);
-	
-	  System.out.println("before readFile()");
-     
+      System.out.println(".................................................................");
 	  readTestCasePositive(client);
-    System.out.println("readFile()");
+	  System.out.println(".................................................................");
+  
 
   }
   private static void writingTestCasePositive(FileStore.Client client) throws TException, SystemException   {
 	  RFileMetadata fileMetadata= new RFileMetadata();
-	  fileMetadata.setFilename("tesing.txt");
+	  String fileName="testing.txt";
+	  fileMetadata.setFilename(fileName);
 	  RFile rFile = new RFile();
 	  rFile.setMeta(fileMetadata);
-	  rFile.setContent("abc");
+	
+	  rFile.setContent(readFileFromSystem(fileName));
 	  
-	  NodeID destNode = client.findSucc(getSHA256( fileMetadata.getFilename()));
-	  
-	  System.out.println(" in writingTestCasePositive "+ destNode.getIp() + " | "+ destNode.getPort());
-		TTransport transport = new TSocket(destNode.getIp(), destNode.getPort());
-		transport.open();
-		TProtocol protocol = new TBinaryProtocol(transport);
-		FileStore.Client writerClient = new FileStore.Client(protocol);
 
-		writerClient.writeFile(rFile);
+	  System.out.println("write to node is requested and hash key of file is "+ getSHA256(fileName));
+		client.writeFile(rFile);
 	  
   }
   private static void readTestCasePositive(FileStore.Client client) throws TException, SystemException   {
-	  String key = getSHA256("tesing.txt");
+		
 	  
-	  NodeID destNode = client.findSucc(getSHA256(key));
+	    String fileName="testing.txt";
+		RFile rFile=client.readFile(fileName);
+		System.out.println("succsessfully read done : ");
+		String key=getSHA256(fileName);
+		System.out.println("key : "+key +" | "+"File Name : "+" | "  +rFile.getMeta().getFilename() +" | "+ " Version : "+ rFile.getMeta().getVersion() +" | "+" Content : "+ rFile.getContent());
 	  
-	  System.out.println(" in readingTestCasePositive "+ destNode.getIp() + " | "+ destNode.getPort());
-		TTransport transport = new TSocket(destNode.getIp(), destNode.getPort());
-		transport.open();
-		TProtocol protocol = new TBinaryProtocol(transport);
-		FileStore.Client readClient = new FileStore.Client(protocol);
-
-		RFile rFile=readClient.readFile("tesing.txt");
-		System.out.println(rFile.getContent() +" | "+ rFile.getMeta().getVersion()+" | "+rFile.getMeta().getFilename());
+  }
+  public static String readFileFromSystem(String fName) {
+	  String data="";
+	  File file= new File(fName);
+	  
+	  try {
+		BufferedReader fileReader= new BufferedReader(new FileReader(file) );
+		String l=null;
+		while( null != (l=fileReader.readLine())) {
+			data=data+l+"\n";
+		}
+	} catch (FileNotFoundException e) {
+		// TODO Auto-generated catch block
+		e.printStackTrace();
+	} catch (IOException e) {
+		// TODO Auto-generated catch block
+		e.printStackTrace();
+	}
+	  
+	  
+	  return data;
 	  
   }
   public static  String getSHA256(String str)  {

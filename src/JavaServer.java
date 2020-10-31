@@ -73,7 +73,7 @@ public class JavaServer {
       // Use this for a multithreaded server
        TServer server = new TThreadPoolServer(new TThreadPoolServer.Args(serverTransport).processor(processor));
 
-      System.out.println("Starting the simple server...");
+      System.out.println("Started the simple server...");
       server.serve();
     } catch (Exception e) {
       e.printStackTrace();
