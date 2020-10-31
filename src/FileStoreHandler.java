@@ -156,10 +156,16 @@ public class FileStoreHandler implements FileStore.Iface {
 	}
 
 	@Override
-	public NodeID findPred(String key) throws TException {
+	public NodeID findPred(String key) throws TException, SystemException {
 		// TODO Auto-generated method stub
 		//System.out.println("in  findPred "+ curNode.getId());
 		// chedck against first finger table entry for break condition
+		if(fingerTable == null) {
+
+			throw new SystemException().setMessage("finger table is empty, please run init script");
+		
+		}
+		
 		if(isBetween(key, curNode.getId(), fingerTable.get(zero).getId())) {
 			//System.out.println(" curNode >> ");
 			return curNode;
@@ -188,9 +194,14 @@ public class FileStoreHandler implements FileStore.Iface {
 	}
 
 	@Override
-	public NodeID getNodeSucc() throws TException {
+	public NodeID getNodeSucc() throws TException, SystemException {
 		// TODO Auto-generated method stub
 		//System.out.println(" getNodeSucc  ");
+		if(fingerTable == null) {
+
+			throw new SystemException().setMessage("finger table is empty, please run init script");
+		
+		}
 		return fingerTable.get(zero);
 	}
 	
