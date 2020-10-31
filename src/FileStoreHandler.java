@@ -46,19 +46,28 @@ public class FileStoreHandler implements FileStore.Iface {
 	}
 	
 	@Override
-	public void writeFile(RFile rFile) throws TException {
+	public void writeFile(RFile rFile) throws TException, SystemException {
 		// TODO Auto-generated method stub
-		System.out.println(" in write file ");
+		//System.out.println(" in write file ");
 		NodeID node = findSucc(getSHA256(rFile.getMeta().getFilename()));
-		System.out.println(" milind ");
-		System.out.println(node.getId() + " | "+ node.getIp() + " | "+ node.getPort());
+		//NodeID node = findSucc("a");
+		
+		if(node.equals(curNode) == false) {
+			SystemException systemException = new SystemException();
+			throw new SystemException().setMessage("error in write file, node is not serving this file key"
+					+ "please check on other node");
+		}
+		System.out.println("currenot "+ curNode.getId() + " | "+ curNode.getIp() + " | "+curNode.getPort());
+		System.out.println("hash  >> "+getSHA256(rFile.getMeta().getFilename()) );
+		//System.out.println(" milind ");
+		//System.out.println(node.getId() + " | "+ node.getIp() + " | "+ node.getPort());
 		//System.out.println("before version "+rFile.getMeta().getVersion()+ " map "+ fileStorage);
 		if(fileStorage.containsKey(rFile.getMeta().getFilename())) {
 			
 			Map<String, String > newMap=fileStorage.get(rFile.getMeta().getFilename());
 			int temp =Integer.parseInt(newMap.get("V"))+1;
 			newMap.put("V", temp+"");
- 				System.out.println(fileStorage);
+ 			//	System.out.println(fileStorage);
 			fileStorage.put(rFile.getMeta().getFilename(),
 					newMap);	
 			
@@ -67,17 +76,25 @@ public class FileStoreHandler implements FileStore.Iface {
 			map.put("V", "0");
 			map.put("C",rFile.getContent() );
 			fileStorage.put(rFile.getMeta().getFilename(), map);
-			System.out.println("misseddd  ");
+			//System.out.println("misseddd  ");
 		}
 	}
 
 	@Override
-	public RFile readFile(String filename) throws TException {
+	public RFile readFile(String filename) throws TException, SystemException {
 		// TODO Auto-generated method stub
-		System.out.println("inside read fing tab size "+fingerTable.size());
+		//System.out.println("inside read fing tab size "+fingerTable.size());
 		
 		String key = getSHA256(filename);
 		NodeID nodeID= findSucc(key);
+		
+		if(nodeID.equals(curNode) == false) {
+			SystemException systemException = new SystemException();
+			throw new SystemException().setMessage("error in read file, node is not serving  this file key, please check on"
+					+ "other node");
+		}
+		
+		
 		RFile rFile = new RFile();
 		RFileMetadata rFileMetadata= new RFileMetadata();
 		
@@ -95,7 +112,7 @@ public class FileStoreHandler implements FileStore.Iface {
 			
 			
 		}else {
-			
+			throw new SystemException().setMessage("error in read file, requested file is not available on this node");
 		}
 		
 		
@@ -108,7 +125,7 @@ public class FileStoreHandler implements FileStore.Iface {
 		fingerTable=node_list;
 		System.out.println("fing tab size "+node_list.size());
 		for(NodeID n: node_list) {
-			//System.out.println(n.getId() +"|"+n.getIp()+"|"+ n.getPort()+"|");
+			System.out.println(n.getId() +"|"+n.getIp()+"|"+ n.getPort()+"|");
 		}
 	}
 
@@ -117,18 +134,18 @@ public class FileStoreHandler implements FileStore.Iface {
 		// TODO Auto-generated method stub
 		//System.out.println("in find succ ");
 		NodeID nodeID= findPred(key);
-		System.out.println(" ooo ");
+		//System.out.println(" ooo ");
 		TTransport transport = null;
 		FileStore.Client client = null;
 		try {
-			System.out.println(nodeID.getIp()+ " .||. "+ nodeID.getPort());
+		//	System.out.println(nodeID.getIp()+ " .||. "+ nodeID.getPort());
 			transport = new TSocket(nodeID.getIp(), nodeID.getPort());
 			transport.open();
 
 			TProtocol protocol = new TBinaryProtocol(transport);
 			client = new FileStore.Client(protocol);
 		} catch (Exception e) {
-			System.err.println("Exception occured:" + e.getMessage());
+			//System.err.println("Exception occured:" + e.getMessage());
 			System.exit(0);
 		}
 	//	System.out.println(" ppp ");
@@ -144,16 +161,16 @@ public class FileStoreHandler implements FileStore.Iface {
 		//System.out.println("in  findPred "+ curNode.getId());
 		// chedck against first finger table entry for break condition
 		if(isBetween(key, curNode.getId(), fingerTable.get(zero).getId())) {
-			System.out.println(" curNode >> ");
+			//System.out.println(" curNode >> ");
 			return curNode;
 		}
 		
 		// if break condition did not meet then 
 		// below for loop to check from bottom up 
-		System.out.println(" ishid ");
+		//System.out.println(" ishid ");
 			for(int i =fingerTable.size()-1; i>zero ;i--) {
 				NodeID fingNode= fingerTable.get(i);
-				if(isBetween(key, curNode.getId(), fingNode.getId())) {
+				if(isBetween(fingNode.getId() , curNode.getId(), key)) {
 	
 					TTransport transport = new TSocket(fingNode.getIp(), fingNode.getPort());
 					transport.open();
@@ -166,14 +183,14 @@ public class FileStoreHandler implements FileStore.Iface {
 			}
 	
 		
-			System.out.println(" return curNode");
+			//System.out.println(" return curNode");
 		return curNode;
 	}
 
 	@Override
 	public NodeID getNodeSucc() throws TException {
 		// TODO Auto-generated method stub
-		System.out.println(" getNodeSucc  ");
+		//System.out.println(" getNodeSucc  ");
 		return fingerTable.get(zero);
 	}
 	
@@ -207,17 +224,33 @@ public class FileStoreHandler implements FileStore.Iface {
 		return hstr.toString();
 	} 
 	
-	public boolean isBetween(String key, String  curId, String fingTabId) {
-		//break condition
-		if(key.compareTo(curId) > 0 && fingTabId.compareTo(key) >0) {
-			return true;
+	public boolean isBetween(String key, String curId, String fingTabId) {
+
+		if (curId.compareTo(fingTabId) < zero) {
+			boolean flag1 = key.compareTo(fingTabId) > zero;
+			boolean flag2 = key.compareTo(fingTabId) <= zero;
+			if (flag1 && flag2) {
+				return true;
+			}
+
+			return false;
+		} else {
+			
+			boolean flag1 = key.compareTo(fingTabId) < zero && key.compareTo(fingTabId) <= zero;
+			if (flag1) {
+				return true;
+			}
+			//
+			boolean flag2 = key.compareTo(fingTabId) > zero && key.compareTo(fingTabId) >= zero;
+			if (flag2) {
+				return true;
+			}
+			
+
+			return false;
 		}
-		
-		// looking up in finger table in down - up 
-		if(fingTabId.compareTo(curId) > 0 && key.compareTo(fingTabId)>0) {
-			return true;
-		}
-		return false;
+
+		// return false;
 	}
 }
 
